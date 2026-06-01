@@ -1,56 +1,77 @@
 <template>
   <div class="space-y-6">
-    <!-- 页面标题 -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-4">
+    <a-breadcrumb class="page-breadcrumb">
+      <a-breadcrumb-item>控制台</a-breadcrumb-item>
+      <a-breadcrumb-item>
+        <router-link :to="{ name: 'domains' }" class="hover:text-blue-500">域名管理</router-link>
+      </a-breadcrumb-item>
+      <a-breadcrumb-item v-if="domain">{{ domain.name }}</a-breadcrumb-item>
+      <a-breadcrumb-item>
+        <span class="inline-flex items-center gap-1">
+          解析记录
+          <a-tooltip :content="`管理 ${domain?.name || ''} 的 DNS 解析记录`" position="right">
+            <icon-info-circle class="text-gray-400 cursor-default" style="font-size:13px" />
+          </a-tooltip>
+        </span>
+      </a-breadcrumb-item>
+    </a-breadcrumb>
+
+    <div class="page-toolbar">
+      <a-space>
         <router-link :to="{ name: 'domains' }">
-          <a-button>
-            <template #icon>
-              <icon-left />
-            </template>
+          <a-button size="small">
+            <template #icon><icon-left /></template>
             返回
           </a-button>
         </router-link>
-        <div>
-          <h2 class="text-2xl font-bold text-gray-900">解析记录</h2>
-          <p class="mt-1 text-sm text-gray-500">{{ domain?.name }}</p>
-        </div>
+        <a-input v-model="filters.keyword" placeholder="搜索主机记录/记录值" allow-clear style="width: 260px" />
+        <a-select v-model="filters.type" placeholder="全部记录类型" allow-clear style="width: 180px">
+          <a-option value="A">A</a-option>
+          <a-option value="AAAA">AAAA</a-option>
+          <a-option value="CNAME">CNAME</a-option>
+          <a-option value="MX">MX</a-option>
+          <a-option value="TXT">TXT</a-option>
+          <a-option value="NS">NS</a-option>
+          <a-option value="SRV">SRV</a-option>
+          <a-option value="CAA">CAA</a-option>
+        </a-select>
+      </a-space>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-gray-500">共 {{ filteredRecords.length }} 条</span>
+        <a-button type="primary" @click="showAddRecordModal = true">
+          <template #icon><icon-plus /></template>
+          添加记录
+        </a-button>
       </div>
-      <a-button type="primary" @click="showAddRecordModal = true">
-        <template #icon>
-          <icon-plus />
-        </template>
-        添加记录
-      </a-button>
     </div>
 
     <!-- 记录列表 -->
     <a-card :bordered="false" class="general-card">
-      <a-table :loading="loading" :data="records" :pagination="false">
+      <a-table :loading="loading" :data="filteredRecords" :pagination="tablePagination">
         <template #columns>
-          <a-table-column title="主机记录" data-index="Name">
+          <a-table-column title="主机记录" data-index="Name" :width="220">
             <template #cell="{ record }">
               <span class="text-primary">{{ record.Name }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="记录类型" data-index="Type" />
-          <a-table-column title="线路类型" data-index="Line">
+          <a-table-column title="记录类型" data-index="Type" :width="120" />
+          <a-table-column title="线路类型" data-index="Line" :width="140">
             <template #cell="{ record }">
               {{ record.Line || '默认' }}
             </template>
           </a-table-column>
-          <a-table-column title="记录值" data-index="Value" />
-          <a-table-column title="TTL" data-index="TTL">
+          <a-table-column title="记录值" data-index="Value" :width="280" />
+          <a-table-column title="TTL" data-index="TTL" :width="100">
             <template #cell="{ record }">
               {{ record.TTL }}秒
             </template>
           </a-table-column>
-          <a-table-column title="备注" data-index="Remark">
+          <a-table-column title="备注" data-index="Remark" :width="180">
             <template #cell="{ record }">
               {{ record.Remark || '-' }}
             </template>
           </a-table-column>
-          <a-table-column title="状态">
+          <a-table-column title="状态" :width="190">
             <template #cell="{ record }">
               <a-space>
                 <a-tag :color="record.Enabled ? 'green' : 'gray'">
@@ -59,27 +80,27 @@
                 <a-tag v-if="domain?.provider === 'cloudflare'" :color="record.Proxied ? 'orange' : 'gray'"
                   class="cursor-pointer" @click="toggleProxy(record)">
                   <template #icon>
-                    <icon-shield />
+                    <icon-safe />
                   </template>
                   {{ record.Proxied ? '已代理' : '未代理' }}
                 </a-tag>
               </a-space>
             </template>
           </a-table-column>
-          <a-table-column title="操作" align="right">
+          <a-table-column title="操作" align="right" :width="180">
             <template #cell="{ record }">
-              <a-space>
-                <a-button @click="editRecord(record)">编辑</a-button>
-                <a-button status="danger" @click="deleteRecord(record)">删除</a-button>
-              </a-space>
+              <div class="table-actions">
+                <a-button type="text" status="normal" @click="editRecord(record)">编辑</a-button>
+                <a-button type="text" status="danger" @click="deleteRecord(record)">删除</a-button>
+              </div>
             </template>
           </a-table-column>
         </template>
         <template #empty>
           <div class="text-center py-8">
             <icon-file class="text-gray-400 text-3xl mb-2" />
-            <div class="text-gray-900 font-medium">暂无记录</div>
-            <div class="text-gray-500 text-sm mt-1">开始添加您的第一条记录吧</div>
+            <div class="text-gray-900 font-medium">暂无数据</div>
+            <div class="text-gray-500 text-sm mt-1">当前筛选条件下暂无解析记录，请调整筛选条件或新增数据</div>
             <a-button type="primary" class="mt-4" @click="showAddRecordModal = true">
               <template #icon>
                 <icon-plus />
@@ -89,46 +110,53 @@
           </div>
         </template>
       </a-table>
+
     </a-card>
 
     <!-- 添加/编辑记录对话框 -->
-    <a-modal v-model:visible="showAddRecordModal" :title="currentRecord ? '编辑记录' : '添加记录'" @ok="handleSaveRecord"
-      :ok-button-props="{ disabled: !isFormValid }" ok-text="保存" cancel-text="取消">
-      <a-form :model="newRecord" layout="vertical">
-        <a-form-item field="Type" label="记录类型">
-          <a-select v-model="newRecord.Type">
-            <a-option value="A">A</a-option>
-            <a-option value="AAAA">AAAA</a-option>
-            <a-option value="CNAME">CNAME</a-option>
-            <a-option value="MX">MX</a-option>
-            <a-option value="TXT">TXT</a-option>
-            <a-option value="NS">NS</a-option>
-            <a-option value="SRV">SRV</a-option>
-            <a-option value="CAA">CAA</a-option>
-          </a-select>
-        </a-form-item>
+    <a-modal v-model:visible="showAddRecordModal" :title="currentRecord ? '编辑解析记录' : '添加解析记录'"
+      @ok="handleSaveRecord" @cancel="resetRecordForm"
+      :ok-button-props="{ disabled: !isFormValid }" ok-text="保存" cancel-text="取消" :width="640">
+      <a-form :model="newRecord" layout="vertical" class="modal-form">
+        <div class="form-grid-2">
+          <a-form-item field="Type" label="记录类型">
+            <a-select v-model="newRecord.Type" placeholder="请选择类型">
+              <a-option value="A">A &nbsp;—&nbsp; IPv4 地址</a-option>
+              <a-option value="AAAA">AAAA &nbsp;—&nbsp; IPv6 地址</a-option>
+              <a-option value="CNAME">CNAME &nbsp;—&nbsp; 别名</a-option>
+              <a-option value="MX">MX &nbsp;—&nbsp; 邮件交换</a-option>
+              <a-option value="TXT">TXT &nbsp;—&nbsp; 文本记录</a-option>
+              <a-option value="NS">NS &nbsp;—&nbsp; 域名服务器</a-option>
+              <a-option value="SRV">SRV &nbsp;—&nbsp; 服务定位</a-option>
+              <a-option value="CAA">CAA &nbsp;—&nbsp; 证书颁发机构</a-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item field="TTL" label="TTL 缓存时间">
+            <a-select v-model="newRecord.TTL">
+              <a-option :value="600">10 分钟</a-option>
+              <a-option :value="1800">30 分钟</a-option>
+              <a-option :value="3600">1 小时</a-option>
+              <a-option :value="43200">12 小时</a-option>
+              <a-option :value="86400">24 小时</a-option>
+            </a-select>
+          </a-form-item>
+        </div>
         <a-form-item field="Name" label="主机记录">
-          <a-input v-model="newRecord.Name" placeholder="@" allow-clear />
+          <a-input v-model="newRecord.Name" placeholder="子域名，如 www；根域名填 @" allow-clear />
         </a-form-item>
         <a-form-item field="Value" label="记录值">
           <a-input v-model="newRecord.Value" :placeholder="getRecordValuePlaceholder(newRecord.Type)" allow-clear />
         </a-form-item>
-        <a-form-item field="TTL" label="TTL (秒)">
-          <a-select v-model="newRecord.TTL">
-            <a-option :value="600">10分钟</a-option>
-            <a-option :value="1800">30分钟</a-option>
-            <a-option :value="3600">1小时</a-option>
-            <a-option :value="43200">12小时</a-option>
-            <a-option :value="86400">1天</a-option>
-          </a-select>
-        </a-form-item>
         <a-form-item field="Remark" label="备注">
-          <a-input v-model="newRecord.Remark" placeholder="可选" allow-clear />
+          <a-input v-model="newRecord.Remark" placeholder="可选，便于识别此记录的用途" allow-clear />
         </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-checkbox v-model="newRecord.Enabled">启用</a-checkbox>
-          </a-space>
+        <a-form-item :hide-label="true">
+          <div class="modal-switch-row">
+            <a-switch v-model="newRecord.Enabled" />
+            <span class="text-sm font-medium" :class="newRecord.Enabled ? 'text-blue-600' : 'text-gray-400'">
+              {{ newRecord.Enabled ? '记录已启用' : '记录已停用' }}
+            </span>
+          </div>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -140,7 +168,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post, put, del } from '@/utils/api'
 import { Message, Modal } from '@arco-design/web-vue'
-import { IconLeft, IconPlus, IconFile } from '@arco-design/web-vue/es/icon'
+import { IconLeft, IconPlus, IconFile, IconSafe, IconInfoCircle } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
 const router = useRouter()
@@ -150,6 +178,10 @@ const records = ref([])
 const loading = ref(true)
 const showAddRecordModal = ref(false)
 const currentRecord = ref(null)
+const filters = ref({
+  keyword: '',
+  type: ''
+})
 
 const newRecord = ref({
   Type: 'A',
@@ -163,6 +195,36 @@ const newRecord = ref({
 const isFormValid = computed(() => {
   return newRecord.value.Type && newRecord.value.Name && newRecord.value.Value
 })
+
+const tablePagination = {
+  pageSize: 10,
+  showTotal: true,
+  showPageSize: true,
+  pageSizeOptions: [10, 20, 50, 100]
+}
+
+const filteredRecords = computed(() => {
+  return records.value.filter(item => {
+    const matchType = !filters.value.type || item.Type === filters.value.type
+    const query = filters.value.keyword?.trim().toLowerCase()
+    const matchKeyword = !query ||
+      (item.Name || '').toLowerCase().includes(query) ||
+      (item.Value || '').toLowerCase().includes(query)
+    return matchType && matchKeyword
+  })
+})
+
+const toApiRecordPayload = (record, recordID = '') => {
+  return {
+    id: recordID || record.Id || '',
+    type: record.Type,
+    name: record.Name,
+    value: record.Value,
+    line: record.Line || '默认',
+    ttl: record.TTL,
+    priority: record.Priority || 0
+  }
+}
 
 // 获取域名信息
 const fetchDomain = async () => {
@@ -207,14 +269,30 @@ const editRecord = (record) => {
   showAddRecordModal.value = true
 }
 
+// 重置表单
+const resetRecordForm = () => {
+  currentRecord.value = null
+  newRecord.value = {
+    Type: 'A',
+    Name: '',
+    Value: '',
+    TTL: 600,
+    Remark: '',
+    Enabled: true
+  }
+}
+
 // 保存记录
 const handleSaveRecord = async () => {
   try {
     if (currentRecord.value) {
-      await put(`/api/v1/domains/${route.params.id}/records/${currentRecord.value.Id}`, newRecord.value)
+      await put(
+        `/api/v1/domains/${route.params.id}/records/${currentRecord.value.Id}`,
+        toApiRecordPayload(newRecord.value, currentRecord.value.Id)
+      )
       Message.success('更新记录成功')
     } else {
-      await post(`/api/v1/domains/${route.params.id}/records`, newRecord.value)
+      await post(`/api/v1/domains/${route.params.id}/records`, toApiRecordPayload(newRecord.value))
       Message.success('添加记录成功')
     }
     showAddRecordModal.value = false
@@ -229,7 +307,7 @@ const handleSaveRecord = async () => {
     }
     await fetchRecords()
   } catch (e) {
-    Message.error(currentRecord.value ? '更新记录失败' : '添加记录失败')
+    Message.error(currentRecord.value ? ('更新记录失败：' + (e.message || '未知错误')) : ('添加记录失败：' + (e.message || '未知错误')))
   }
 }
 
@@ -256,8 +334,8 @@ const deleteRecord = (record) => {
 const toggleProxy = async (record) => {
   try {
     await put(`/api/v1/domains/${route.params.id}/records/${record.Id}`, {
-      ...record,
-      Proxied: !record.Proxied
+      ...toApiRecordPayload(record, record.Id),
+      proxied: !record.Proxied
     })
     await fetchRecords()
   } catch (e) {
@@ -271,8 +349,4 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-.general-card {
-  border-radius: 8px;
-}
-</style>
+<style scoped></style>
