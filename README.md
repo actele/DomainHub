@@ -1,4 +1,4 @@
-# Domain Manager
+# DomainHub
 
 一个基于 Vue3 和 Go 的 DNS 域名管理系统，支持多个 DNS 服务商的域名管理和解析记录维护。
 
@@ -71,8 +71,23 @@ npm run dev
 ```bash
 cd backend
 go mod tidy
+go install github.com/air-verse/air@latest
+air
+```
+
+后端目录已提供 air 配置文件 [backend/.air.toml](backend/.air.toml)，修改 Go 代码或 [backend/config/config.json](backend/config/config.json) 后会自动重建并重启服务。
+
+如果你只想临时直接运行，也可以继续使用：
+
+```bash
+cd backend
 go run main.go
 ```
+
+首次启动后端时，如果系统中还不存在用户，会自动创建默认管理员账号：
+
+- 用户名：admin
+- 密码：admin
 
 ## 贡献
 
