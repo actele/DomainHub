@@ -9,6 +9,9 @@ import (
 // Domain is the predicate function for domain builders.
 type Domain func(*sql.Selector)
 
+// Provider is the predicate function for provider builders.
+type Provider func(*sql.Selector)
+
 // ProviderKey is the predicate function for providerkey builders.
 type ProviderKey func(*sql.Selector)
 
