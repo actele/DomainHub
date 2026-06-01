@@ -60,6 +60,7 @@ func (c *UserController) Login(ctx *gin.Context) {
 	// 生成JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
+		"role":    user.Role,
 		"exp":     time.Now().Add(time.Hour * time.Duration(config.GlobalConfig.JWT.Expire)).Unix(),
 	})
 
@@ -69,7 +70,7 @@ func (c *UserController) Login(ctx *gin.Context) {
 		return
 	}
 
-	response.Success(ctx, gin.H{"token": tokenString})
+	response.Success(ctx, gin.H{"token": tokenString, "role": user.Role})
 }
 
 // ChangePassword 修改密码
