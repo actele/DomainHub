@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// Domain is the client for interacting with the Domain builders.
 	Domain *DomainClient
+	// Provider is the client for interacting with the Provider builders.
+	Provider *ProviderClient
 	// ProviderKey is the client for interacting with the ProviderKey builders.
 	ProviderKey *ProviderKeyClient
 	// User is the client for interacting with the User builders.
@@ -150,6 +152,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Domain = NewDomainClient(tx.config)
+	tx.Provider = NewProviderClient(tx.config)
 	tx.ProviderKey = NewProviderKeyClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 }
