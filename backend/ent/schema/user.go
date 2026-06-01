@@ -17,6 +17,8 @@ func (User) Fields() []ent.Field {
 		field.Int("id").Positive(),
 		field.String("username").Unique(),
 		field.String("password"),
+		field.String("role").Default("user"),     // admin | user
+		field.String("status").Default("active"), // active | disabled
 		field.Time("created_at"),
 		field.Time("updated_at"),
 	}
