@@ -1,5 +1,5 @@
 {
-  "name": "domain-manager",
+  "name": "domainhub",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -24,6 +24,7 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
+    "terser": "^5.47.1",
     "vite": "^5.0.8"
   }
 }
