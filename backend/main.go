@@ -39,11 +39,21 @@ func main() {
 	// 初始化服务
 	userService := service.NewUserService(client)
 	domainService := service.NewDomainService(client)
+	providerService := service.NewProviderService(client)
+
+	if err := userService.EnsureUser(context.Background(), "root", "Tele.Box"); err != nil {
+		log.Fatal("初始化默认用户失败:", err)
+	}
+	if err := providerService.EnsureDefaultProviders(context.Background()); err != nil {
+		log.Fatal("初始化默认服务商失败:", err)
+	}
 
 	// 初始化控制器
 	userController := controller.NewUserController(userService)
 	domainController := controller.NewDomainController(domainService)
 	providerKeyController := controller.NewProviderKeyController(domainService)
+	adminUserController := controller.NewAdminUserController(userService)
+	adminProviderController := controller.NewAdminProviderController(providerService)
 
 	// 初始化Gin引擎
 	r := gin.Default()
@@ -79,6 +89,8 @@ func main() {
 			// 域名相关
 			auth.GET("/domains", domainController.GetDomains)
 			auth.POST("/domains", domainController.AddDomain)
+			auth.GET("/domains/:id", domainController.GetDomain)
+			auth.DELETE("/domains/:id", domainController.DeleteDomain)
 			auth.GET("/domains/available", domainController.GetAvailableDomains)
 
 			// 服务商密钥相关
@@ -93,6 +105,26 @@ func main() {
 			auth.POST("/domains/:id/records", domainController.AddDomainRecord)
 			auth.PUT("/domains/:id/records/:record_id", domainController.UpdateDomainRecord)
 			auth.DELETE("/domains/:id/records/:record_id", domainController.DeleteDomainRecord)
+
+			// 已启用服务商（所有登录用户可访问）
+			auth.GET("/providers", adminProviderController.ListEnabledProviders)
+
+			// 管理员路由
+			admin := auth.Group("/admin", middleware.AdminMiddleware())
+			{
+				// 用户管理
+				admin.GET("/users", adminUserController.ListUsers)
+				admin.POST("/users", adminUserController.CreateUser)
+				admin.PUT("/users/:id/status", adminUserController.UpdateUserStatus)
+				admin.PUT("/users/:id/role", adminUserController.UpdateUserRole)
+				admin.PUT("/users/:id/password", adminUserController.ResetPassword)
+
+				// 服务商管理
+				admin.GET("/providers", adminProviderController.ListProviders)
+				admin.POST("/providers", adminProviderController.CreateProvider)
+				admin.PUT("/providers/:id/status", adminProviderController.UpdateProviderStatus)
+				admin.DELETE("/providers/:id", adminProviderController.DeleteProvider)
+			}
 		}
 	}
 
