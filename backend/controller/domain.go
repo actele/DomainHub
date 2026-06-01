@@ -70,6 +70,23 @@ func (c *DomainController) GetDomain(ctx *gin.Context) {
 	response.Success(ctx, domain)
 }
 
+// DeleteDomain 删除域名
+func (c *DomainController) DeleteDomain(ctx *gin.Context) {
+	userID := ctx.GetInt("user_id")
+	domainID, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		response.Error(ctx, response.InvalidParams)
+		return
+	}
+
+	if err := c.domainService.DeleteDomain(ctx, userID, domainID); err != nil {
+		response.ErrorMessage(ctx, response.InternalError, err.Error())
+		return
+	}
+
+	response.Success(ctx, nil)
+}
+
 // GetAvailableDomains 获取可用域名列表
 func (c *DomainController) GetAvailableDomains(ctx *gin.Context) {
 	userID := ctx.GetInt("user_id")
@@ -119,6 +136,7 @@ func (c *DomainController) AddDomainRecord(ctx *gin.Context) {
 		Type     string `json:"type" binding:"required"`
 		Name     string `json:"name" binding:"required"`
 		Value    string `json:"value" binding:"required"`
+		Line     string `json:"line"`
 		Priority int    `json:"priority"`
 		TTL      int    `json:"ttl"`
 	}
@@ -132,6 +150,7 @@ func (c *DomainController) AddDomainRecord(ctx *gin.Context) {
 		Type:  req.Type,
 		Name:  req.Name,
 		Value: req.Value,
+		Line:  req.Line,
 		TTL:   req.TTL,
 	}
 
@@ -157,6 +176,7 @@ func (c *DomainController) UpdateDomainRecord(ctx *gin.Context) {
 		Type     string `json:"type" binding:"required"`
 		Name     string `json:"name" binding:"required"`
 		Value    string `json:"value" binding:"required"`
+		Line     string `json:"line"`
 		Priority int    `json:"priority"`
 		TTL      int    `json:"ttl"`
 	}
@@ -171,6 +191,7 @@ func (c *DomainController) UpdateDomainRecord(ctx *gin.Context) {
 		Type:  req.Type,
 		Name:  req.Name,
 		Value: req.Value,
+		Line:  req.Line,
 		TTL:   req.TTL,
 	}
 
