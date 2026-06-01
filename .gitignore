@@ -18,6 +18,7 @@ frontend/.env.*
 
 # 后端依赖和构建
 backend/bin/
+backend/tmp/
 backend/data/*.db
 backend/config/config.*.json
 !backend/config/config.json
