@@ -5,6 +5,7 @@ package ent
 import (
 	"context"
 	"domain-manager/ent/domain"
+	"domain-manager/ent/provider"
 	"domain-manager/ent/providerkey"
 	"domain-manager/ent/user"
 	"errors"
@@ -76,6 +77,7 @@ func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			domain.Table:      domain.ValidColumn,
+			provider.Table:    provider.ValidColumn,
 			providerkey.Table: providerkey.ValidColumn,
 			user.Table:        user.ValidColumn,
 		})
