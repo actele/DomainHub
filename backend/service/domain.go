@@ -133,6 +133,25 @@ func (s *DomainService) GetDomain(ctx context.Context, userId int, domainId int)
 	return d, nil
 }
 
+// DeleteDomain 删除域名
+func (s *DomainService) DeleteDomain(ctx context.Context, userId int, domainId int) error {
+	deleted, err := s.client.Domain.Delete().
+		Where(
+			domain.IDEQ(domainId),
+			domain.HasUserWith(user.IDEQ(userId)),
+		).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("删除域名失败: %v", err)
+	}
+
+	if deleted == 0 {
+		return fmt.Errorf("域名不存在或无权访问")
+	}
+
+	return nil
+}
+
 // GetDomainRecords 获取域名的解析记录
 func (s *DomainService) GetDomainRecords(ctx context.Context, userId int, domainId int) ([]provider.Record, error) {
 	// 获取域名信息
