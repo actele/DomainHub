@@ -3,10 +3,10 @@
     "port": 8080
   },
   "database": {
-    "path": "/app/backend/data/domain-manager.db?_fk=1"
+    "path": "./data/domainhub.db?_fk=1"
   },
   "jwt": {
-    "secret": "dasf123dsasax21xasade213a23@#$%#@#$%",
+    "secret": "81D1999E-8E70-4B93-B69B-264A97ED5C22",
     "expire": 24
   }
 }
