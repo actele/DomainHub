@@ -86,9 +86,9 @@ export const put = async (url, data) => {
   }
 }
 
-export const del = async (url) => {
+export const del = async (url, data) => {
   try {
-    return await api.delete(url)
+    return await api.delete(url, { data })
   } catch (error) {
     throw error
   }
