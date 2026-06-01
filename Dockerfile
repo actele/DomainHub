@@ -21,7 +21,7 @@ ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
 COPY backend/go.* ./
 RUN go mod download
 COPY backend/ ./
-RUN go build -o domain-manager .
+RUN go build -o domainhub .
 
 # 最终运行阶段
 FROM alpine:3.18
@@ -35,7 +35,7 @@ RUN mkdir -p /app/data
 
 # 复制构建产物
 COPY --from=frontend-builder /app/frontend/dist /app/dist
-COPY --from=backend-builder /app/backend/domain-manager /app
+COPY --from=backend-builder /app/backend/domainhub /app
 COPY --from=backend-builder /app/backend/config /app/config
 
 # 设置环境变量
@@ -48,4 +48,4 @@ VOLUME ["/app/data"]
 EXPOSE 8080
 
 # 启动应用
-CMD ["/app/domain-manager"]
+CMD ["/app/domainhub"]
