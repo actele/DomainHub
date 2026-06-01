@@ -81,7 +81,11 @@ func (p *TencentProvider) AddRecord(domain string, record provider.Record) error
 	request.Domain = &domain
 	request.SubDomain = &record.Name
 	request.RecordType = &record.Type
-	request.RecordLine = &record.Line
+	line := record.Line
+	if line == "" {
+		line = "默认"
+	}
+	request.RecordLine = &line
 	request.Value = &record.Value
 	ttl := uint64(record.TTL)
 	request.TTL = &ttl
@@ -102,7 +106,11 @@ func (p *TencentProvider) UpdateRecord(domain string, record provider.Record) er
 	request.RecordId = &recordId
 	request.SubDomain = &record.Name
 	request.RecordType = &record.Type
-	request.RecordLine = &record.Line
+	line := record.Line
+	if line == "" {
+		line = "默认"
+	}
+	request.RecordLine = &line
 	request.Value = &record.Value
 	ttl := uint64(record.TTL)
 	request.TTL = &ttl
