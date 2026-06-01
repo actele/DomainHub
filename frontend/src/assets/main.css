@@ -1,3 +1,266 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+	/* Brand */
+	--brand-1: #1677ff;
+	--brand-2: #4096ff;
+	--brand-3: #e6f4ff;
+
+	/* Neutral */
+	--gray-1: #ffffff;
+	--gray-2: #fafafa;
+	--gray-3: #f5f7fa;
+	--gray-4: #e5e7eb;
+	--gray-7: #6b7280;
+	--gray-9: #1f2937;
+
+	/* Semantic */
+	--app-bg: var(--gray-3);
+	--app-surface: var(--gray-1);
+	--app-surface-soft: var(--gray-2);
+	--app-text: var(--gray-9);
+	--app-text-secondary: var(--gray-7);
+	--app-border: var(--gray-4);
+	--app-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+	--app-primary: var(--brand-1);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+	min-height: 100%;
+}
+
+body {
+	margin: 0;
+	font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+	color: var(--app-text);
+	background: var(--app-bg);
+}
+
+.page-title {
+	font-size: 22px;
+	font-weight: 600;
+	color: #0f172a;
+	letter-spacing: 0;
+}
+
+.page-subtitle {
+	margin-top: 4px;
+	color: var(--app-text-secondary);
+	font-size: 13px;
+}
+
+.general-card {
+	border-radius: 8px;
+	border: 1px solid var(--app-border);
+	box-shadow: var(--app-shadow);
+}
+
+.page-breadcrumb {
+	font-size: 13px;
+	color: var(--app-text-secondary);
+}
+
+.page-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+}
+
+.table-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.text-primary {
+	color: var(--app-primary);
+}
+
+.arco-layout-sider-light {
+	border-right: 1px solid var(--app-border);
+}
+
+.arco-table {
+	border-radius: 8px;
+}
+
+.arco-table-th {
+	background: #fafafa;
+}
+
+.arco-btn-primary {
+	background-color: var(--app-primary);
+}
+
+.arco-btn-primary:hover {
+	background-color: #4096ff;
+}
+
+.arco-btn-text {
+	padding-left: 6px;
+	padding-right: 6px;
+}
+
+.arco-layout-header {
+	background: #fff;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.arco-layout-sider {
+	background: #fff;
+}
+
+/* ========== Modal / Dialog ========== */
+.arco-modal {
+	border-radius: 12px !important;
+	overflow: hidden;
+}
+
+.arco-modal-header {
+	padding: 20px 24px 16px;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.arco-modal-title {
+	font-size: 16px !important;
+	font-weight: 600 !important;
+	color: #0f172a;
+}
+
+.arco-modal-body {
+	padding: 20px 24px !important;
+}
+
+.arco-modal-footer {
+	padding: 14px 24px !important;
+	border-top: 1px solid var(--app-border);
+}
+
+/* Modal form utilities */
+.modal-form .arco-form-item {
+	margin-bottom: 16px;
+}
+
+.modal-form .arco-form-item:last-child {
+	margin-bottom: 0;
+}
+
+.modal-form .arco-form-item-label {
+	font-weight: 500;
+	color: #374151;
+	font-size: 13px;
+}
+
+.form-grid-2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	column-gap: 16px;
+}
+
+/* Step bar in domain add modal */
+.modal-step-bar {
+	display: flex;
+	align-items: center;
+	margin-bottom: 20px;
+	padding: 12px 16px;
+	background: #f8faff;
+	border: 1px solid #dbeafe;
+	border-radius: 8px;
+}
+
+.modal-step-bar .step-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: #9ca3af;
+	font-weight: 500;
+}
+
+.modal-step-bar .step-item.active {
+	color: var(--app-primary);
+}
+
+.modal-step-bar .step-item.done {
+	color: #6b7280;
+}
+
+.modal-step-bar .step-dot {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	border: 2px solid #d1d5db;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	font-weight: 700;
+	flex-shrink: 0;
+	transition: all 0.2s;
+}
+
+.modal-step-bar .step-item.active .step-dot {
+	border-color: var(--app-primary);
+	background: var(--app-primary);
+	color: #fff;
+}
+
+.modal-step-bar .step-item.done .step-dot {
+	border-color: #9ca3af;
+	background: #f3f4f6;
+	color: #6b7280;
+}
+
+.modal-step-bar .step-connector {
+	flex: 1;
+	height: 1px;
+	background: #e5e7eb;
+	margin: 0 12px;
+}
+
+/* Credential block in provider key modal */
+.modal-credential-block {
+	background: #f8faff;
+	border: 1px solid #dbeafe;
+	border-radius: 8px;
+	padding: 16px 16px 4px;
+	margin-top: 4px;
+}
+
+.modal-credential-block .block-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+	color: var(--app-primary);
+	margin-bottom: 12px;
+}
+
+/* Provider radio group */
+.provider-radio-group .arco-radio-button-content {
+	padding: 0 16px;
+}
+
+/* Switch row */
+.modal-switch-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 14px;
+	background: var(--app-surface-soft);
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+}
