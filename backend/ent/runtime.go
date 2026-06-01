@@ -4,6 +4,7 @@ package ent
 
 import (
 	"domain-manager/ent/domain"
+	"domain-manager/ent/provider"
 	"domain-manager/ent/providerkey"
 	"domain-manager/ent/schema"
 	"domain-manager/ent/user"
@@ -27,6 +28,24 @@ func init() {
 	domainDescID := domainFields[0].Descriptor()
 	// domain.IDValidator is a validator for the "id" field. It is called by the builders before save.
 	domain.IDValidator = domainDescID.Validators[0].(func(int) error)
+	providerFields := schema.Provider{}.Fields()
+	_ = providerFields
+	// providerDescName is the schema descriptor for name field.
+	providerDescName := providerFields[1].Descriptor()
+	// provider.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	provider.NameValidator = providerDescName.Validators[0].(func(string) error)
+	// providerDescType is the schema descriptor for type field.
+	providerDescType := providerFields[2].Descriptor()
+	// provider.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	provider.TypeValidator = providerDescType.Validators[0].(func(string) error)
+	// providerDescEnabled is the schema descriptor for enabled field.
+	providerDescEnabled := providerFields[4].Descriptor()
+	// provider.DefaultEnabled holds the default value on creation for the enabled field.
+	provider.DefaultEnabled = providerDescEnabled.Default.(bool)
+	// providerDescID is the schema descriptor for id field.
+	providerDescID := providerFields[0].Descriptor()
+	// provider.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	provider.IDValidator = providerDescID.Validators[0].(func(int) error)
 	providerkeyFields := schema.ProviderKey{}.Fields()
 	_ = providerkeyFields
 	// providerkeyDescName is the schema descriptor for name field.
@@ -49,6 +68,14 @@ func init() {
 	providerkey.IDValidator = providerkeyDescID.Validators[0].(func(int) error)
 	userFields := schema.User{}.Fields()
 	_ = userFields
+	// userDescRole is the schema descriptor for role field.
+	userDescRole := userFields[3].Descriptor()
+	// user.DefaultRole holds the default value on creation for the role field.
+	user.DefaultRole = userDescRole.Default.(string)
+	// userDescStatus is the schema descriptor for status field.
+	userDescStatus := userFields[4].Descriptor()
+	// user.DefaultStatus holds the default value on creation for the status field.
+	user.DefaultStatus = userDescStatus.Default.(string)
 	// userDescID is the schema descriptor for id field.
 	userDescID := userFields[0].Descriptor()
 	// user.IDValidator is a validator for the "id" field. It is called by the builders before save.
