@@ -46,8 +46,11 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 将用户ID存储在上下文中
+		// 将用户ID和角色存储在上下文中
 		c.Set("user_id", int(claims["user_id"].(float64)))
+		if role, ok := claims["role"].(string); ok {
+			c.Set("user_role", role)
+		}
 		c.Next()
 	}
 }
