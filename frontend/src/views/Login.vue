@@ -45,6 +45,7 @@ import { ref, reactive } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { useRouter } from 'vue-router'
 import api from '@/utils/api'
+import { clearDomainRecordsCache } from '@/utils/domainRecordsCache'
 
 const router = useRouter()
 const loading = ref(false)
@@ -73,6 +74,7 @@ const handleSubmit = async () => {
 
     localStorage.setItem('token', data.token)
     localStorage.setItem('role', data.role || 'user')
+    clearDomainRecordsCache()
 
     setTimeout(() => {
       router.push('/dashboard')

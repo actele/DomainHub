@@ -6,6 +6,7 @@ import (
 	"domain-manager/ent/user"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -13,6 +14,15 @@ import (
 
 type UserService struct {
 	client *ent.Client
+}
+
+// BuiltInUsername 是系统内置账号。该账号只用于系统初始化和登录，
+// 不出现在用户管理列表，也不能通过用户管理或修改密码接口变更。
+const BuiltInUsername = "root"
+
+// IsBuiltInUsername 判断用户名是否属于系统内置账号名称。
+func IsBuiltInUsername(username string) bool {
+	return strings.EqualFold(strings.TrimSpace(username), BuiltInUsername)
 }
 
 func NewUserService(client *ent.Client) *UserService {
@@ -27,17 +37,27 @@ func (s *UserService) EnsureUser(ctx context.Context, username, password string)
 	}
 
 	if ent.IsNotFound(err) {
-		// 创建 admin 用户
+		// 创建内置 admin 用户
 		if _, err := s.createUserWithRole(ctx, username, password, "admin"); err != nil {
 			return fmt.Errorf("创建默认用户失败: %w", err)
 		}
 		return nil
 	}
 
-	// 如果已存在但不是 admin，升级为 admin
+	// 内置账号始终保持管理员且可登录，避免被历史数据中的状态影响。
+	update := s.client.User.UpdateOne(u)
+	changed := false
 	if u.Role != "admin" {
-		if err := s.client.User.UpdateOne(u).SetRole("admin").Exec(ctx); err != nil {
-			return fmt.Errorf("升级默认用户为管理员失败: %w", err)
+		update.SetRole("admin")
+		changed = true
+	}
+	if u.Status != "active" {
+		update.SetStatus("active")
+		changed = true
+	}
+	if changed {
+		if err := update.SetUpdatedAt(time.Now()).Exec(ctx); err != nil {
+			return fmt.Errorf("修复内置用户状态失败: %w", err)
 		}
 	}
 	return nil
@@ -45,11 +65,16 @@ func (s *UserService) EnsureUser(ctx context.Context, username, password string)
 
 // CreateUser 创建普通用户（注册接口使用）
 func (s *UserService) CreateUser(ctx context.Context, username, password string) (*ent.User, error) {
+	if IsBuiltInUsername(username) {
+		return nil, errors.New("root 是系统内置用户，不能创建同名账号")
+	}
 	return s.createUserWithRole(ctx, username, password, "user")
 }
 
 // createUserWithRole 内部创建用户
 func (s *UserService) createUserWithRole(ctx context.Context, username, password, role string) (*ent.User, error) {
+	username = strings.TrimSpace(username)
+
 	exists, err := s.client.User.Query().Where(user.UsernameEQ(username)).Exist(ctx)
 	if err != nil {
 		return nil, err
@@ -98,6 +123,9 @@ func (s *UserService) ChangePassword(ctx context.Context, userID int, oldPasswor
 	if err != nil {
 		return errors.New("用户不存在")
 	}
+	if IsBuiltInUsername(u.Username) {
+		return errors.New("root 是系统内置用户，不能修改密码")
+	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(oldPassword)); err != nil {
 		return errors.New("旧密码错误")
@@ -116,11 +144,25 @@ func (s *UserService) ChangePassword(ctx context.Context, userID int, oldPasswor
 
 // ListUsers 管理员获取所有用户列表
 func (s *UserService) ListUsers(ctx context.Context) ([]*ent.User, error) {
-	return s.client.User.Query().Order(ent.Asc(user.FieldID)).All(ctx)
+	users, err := s.client.User.Query().Order(ent.Asc(user.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	visibleUsers := make([]*ent.User, 0, len(users))
+	for _, u := range users {
+		if !IsBuiltInUsername(u.Username) {
+			visibleUsers = append(visibleUsers, u)
+		}
+	}
+	return visibleUsers, nil
 }
 
 // AdminCreateUser 管理员创建用户
 func (s *UserService) AdminCreateUser(ctx context.Context, username, password, role string) (*ent.User, error) {
+	if IsBuiltInUsername(username) {
+		return nil, errors.New("root 是系统内置用户，不能创建同名账号")
+	}
 	if role != "admin" && role != "user" {
 		role = "user"
 	}
@@ -129,7 +171,11 @@ func (s *UserService) AdminCreateUser(ctx context.Context, username, password, r
 
 // UpdateUserStatus 更新用户状态（active/disabled）
 func (s *UserService) UpdateUserStatus(ctx context.Context, userID int, status string) error {
-	return s.client.User.UpdateOneID(userID).
+	u, err := s.getMutableUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return s.client.User.UpdateOne(u).
 		SetStatus(status).
 		SetUpdatedAt(time.Now()).
 		Exec(ctx)
@@ -137,7 +183,11 @@ func (s *UserService) UpdateUserStatus(ctx context.Context, userID int, status s
 
 // UpdateUserRole 更新用户角色（admin/user）
 func (s *UserService) UpdateUserRole(ctx context.Context, userID int, role string) error {
-	return s.client.User.UpdateOneID(userID).
+	u, err := s.getMutableUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return s.client.User.UpdateOne(u).
 		SetRole(role).
 		SetUpdatedAt(time.Now()).
 		Exec(ctx)
@@ -145,12 +195,32 @@ func (s *UserService) UpdateUserRole(ctx context.Context, userID int, role strin
 
 // AdminResetPassword 管理员重置用户密码
 func (s *UserService) AdminResetPassword(ctx context.Context, userID int, newPassword string) error {
+	u, err := s.getMutableUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	return s.client.User.UpdateOneID(userID).
+	return s.client.User.UpdateOne(u).
 		SetPassword(string(hashedPassword)).
 		SetUpdatedAt(time.Now()).
 		Exec(ctx)
+}
+
+// getMutableUser 返回允许被管理接口修改的用户，内置账号在这里统一拦截。
+func (s *UserService) getMutableUser(ctx context.Context, userID int) (*ent.User, error) {
+	u, err := s.client.User.Get(ctx, userID)
+	if ent.IsNotFound(err) {
+		return nil, errors.New("用户不存在")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if IsBuiltInUsername(u.Username) {
+		return nil, errors.New("root 是系统内置用户，不能修改")
+	}
+	return u, nil
 }

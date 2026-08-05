@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="page-stack">
     <a-breadcrumb class="page-breadcrumb">
       <a-breadcrumb-item>控制台</a-breadcrumb-item>
       <a-breadcrumb-item>
@@ -12,21 +12,38 @@
       </a-breadcrumb-item>
     </a-breadcrumb>
 
+    <div class="page-heading">
+      <div>
+        <div class="page-eyebrow">CREDENTIALS</div>
+        <h1 class="page-title">服务商密钥</h1>
+        <p class="page-subtitle">集中管理 DNS 服务商访问凭据，保存后即可在域名管理中使用。</p>
+      </div>
+      <a-button type="primary" @click="openAddKeyModal">
+        <template #icon><IconPlus /></template>
+        添加密钥
+      </a-button>
+    </div>
+
+    <a-alert v-if="saveFeedback" type="success" show-icon closable class="page-feedback"
+      @close="saveFeedback = null">
+      <template #title>{{ saveFeedback.title }}</template>
+      {{ saveFeedback.message }}
+    </a-alert>
+
     <div class="page-toolbar">
-      <a-space>
-        <a-input v-model="filters.keyword" placeholder="搜索密钥名称" allow-clear style="width: 240px" />
-        <a-select v-model="filters.provider" placeholder="全部服务商" allow-clear style="width: 180px">
-          <a-option value="aliyun">阿里云</a-option>
-          <a-option value="tencent">腾讯云</a-option>
-          <a-option value="cloudflare">Cloudflare</a-option>
+      <a-space wrap class="toolbar-filters">
+        <a-input v-model="filters.keyword" placeholder="搜索密钥名称" allow-clear class="toolbar-input toolbar-input-search" />
+        <a-select v-model="filters.provider" placeholder="全部服务商" allow-clear class="toolbar-input toolbar-input-provider">
+          <a-option v-for="provider in providerOptions" :key="provider.value" :value="provider.value">
+            {{ provider.label }}
+          </a-option>
         </a-select>
       </a-space>
-      <div class="flex items-center gap-3">
-        <span class="text-sm text-gray-500">共 {{ filteredKeys.length }} 条</span>
-        <a-button type="primary" @click="showAddKeyModal = true">
-          <template #icon><IconPlus /></template>
-          添加密钥
-        </a-button>
+      <div class="toolbar-meta">
+        <span class="count-chip">
+          <IconTool />
+          共 {{ filteredKeys.length }} 条
+        </span>
       </div>
     </div>
 
@@ -36,25 +53,33 @@
         <template #columns>
           <a-table-column title="密钥名称" :width="260">
             <template #cell="{ record }">
-              <div class="flex items-center gap-2 py-1">
-                <IconTool class="text-gray-400" />
-                <span class="text-primary font-semibold">{{ record.name }}</span>
+              <div class="key-name-cell">
+                <div class="key-avatar"><IconTool /></div>
+                <div class="min-w-0">
+                  <div class="key-name">{{ record.name }}</div>
+                  <div class="key-id">ID · {{ record.id }}</div>
+                </div>
               </div>
             </template>
           </a-table-column>
           <a-table-column title="服务商" :width="180">
             <template #cell="{ record }">
-              {{ providerNames[record.provider] || record.provider }}
+              <a-tag :color="providerTagColors[record.provider] || 'gray'" size="small">
+                {{ providerNames[record.provider] || record.provider }}
+              </a-tag>
             </template>
           </a-table-column>
           <a-table-column title="凭据摘要" :width="320">
             <template #cell="{ record }">
-              {{ getKeyFieldName(record.provider, 'access_key') }}: {{ maskKey(record.access_key) }}
+              <div class="credential-summary">
+                <span class="credential-label">{{ getKeyFieldName(record.provider, 'access_key') }}</span>
+                <code>{{ maskKey(record.access_key) }}</code>
+              </div>
             </template>
           </a-table-column>
           <a-table-column title="创建时间" :width="200">
             <template #cell="{ record }">
-              {{ new Date(record.created_at).toLocaleString() }}
+              <span class="muted-cell">{{ new Date(record.created_at).toLocaleString() }}</span>
             </template>
           </a-table-column>
           <a-table-column title="操作" align="right" :width="180">
@@ -63,7 +88,8 @@
                 <a-button type="text" status="normal" @click="handleEditKeyName(record)">
                   编辑名称
                 </a-button>
-                <a-button type="text" status="danger" @click="handleDeleteKey(record)">
+                <a-button type="text" status="danger" :loading="deletingKeyId === record.id"
+                  :disabled="!!deletingKeyId" @click="handleDeleteKey(record)">
                   删除
                 </a-button>
               </div>
@@ -71,11 +97,11 @@
           </a-table-column>
         </template>
         <template #empty>
-          <div class="text-center py-8">
-            <IconTool class="text-gray-400 text-3xl mb-2" />
-            <div class="text-gray-900 font-medium">暂无数据</div>
-            <div class="text-gray-500 text-sm mt-1">当前筛选条件下暂无密钥，请调整筛选条件或新增数据</div>
-            <a-button type="primary" class="mt-4" @click="showAddKeyModal = true">
+          <div class="empty-state">
+            <div class="empty-state-icon"><IconTool /></div>
+            <div class="empty-state-title">暂无密钥</div>
+            <div class="empty-state-description">当前筛选条件下暂无密钥，可以先添加一个服务商凭据。</div>
+            <a-button type="primary" class="mt-4" @click="openAddKeyModal">
               <template #icon>
                 <IconPlus />
               </template>
@@ -87,10 +113,21 @@
     </a-card>
 
     <!-- 添加密钥对话框 -->
-    <a-modal v-model:visible="showAddKeyModal" title="添加服务商密钥" @ok="handleAddKey" @cancel="resetForm"
-      :ok-button-props="{ disabled: !canSubmitNewKey }"
+    <a-modal v-model:visible="showAddKeyModal" title="添加服务商密钥" @ok="handleAddKey" @cancel="handleCancelAdd"
+      :ok-button-props="{ disabled: !canSubmitNewKey || savingKey, loading: savingKey }"
       ok-text="添加" cancel-text="取消" :width="540">
       <a-form :model="newKey" layout="vertical" class="modal-form">
+        <a-alert v-if="formError" type="error" show-icon class="form-feedback mb-4">
+          {{ formError }}
+        </a-alert>
+        <div class="modal-intro">
+          <div class="modal-intro-icon"><IconTool /></div>
+          <div>
+            <div class="modal-intro-title">安全添加凭据</div>
+            <div class="modal-intro-text">密钥仅用于访问对应服务商 API，页面不会展示完整 Secret。</div>
+          </div>
+        </div>
+
         <!-- 第一步：自定义名称 -->
         <a-form-item field="name" label="密钥名称" required>
           <a-input v-model="newKey.name" placeholder="输入一个便于识别的名称" allow-clear />
@@ -98,10 +135,10 @@
 
         <!-- 第二步：下拉选择服务商 -->
         <a-form-item field="provider" label="服务商">
-          <a-select v-model="newKey.provider" placeholder="请选择服务商" @change="() => { newKey.access_key=''; newKey.secret_key='' }">
-            <a-option value="aliyun">阿里云</a-option>
-            <a-option value="tencent">腾讯云</a-option>
-            <a-option value="cloudflare">Cloudflare</a-option>
+          <a-select v-model="newKey.provider" placeholder="请选择服务商" @change="handleProviderChange">
+            <a-option v-for="provider in providerOptions" :key="provider.value" :value="provider.value">
+              {{ provider.label }}
+            </a-option>
           </a-select>
         </a-form-item>
 
@@ -119,6 +156,7 @@
                 :placeholder="`请输入 ${getKeyFieldName(newKey.provider, 'secret_key')}`"
                 allow-clear />
             </a-form-item>
+            <div v-else class="credential-hint">Cloudflare 使用 API Token，无需填写 Secret Key。</div>
           </div>
         </template>
       </a-form>
@@ -126,7 +164,7 @@
 
     <!-- 编辑密钥名称对话框 -->
     <a-modal v-model:visible="showEditNameModal" title="修改密钥名称" @ok="handleUpdateKeyName" @cancel="resetEditForm"
-      :ok-button-props="{ disabled: !editKey.newName }" ok-text="保存" cancel-text="取消" :width="420">
+      :ok-button-props="{ disabled: !canSubmitEditName || savingName, loading: savingName }" ok-text="保存" cancel-text="取消" :width="420">
       <a-form :model="editKey" layout="vertical" class="modal-form">
         <a-form-item field="newName" label="新名称" required>
           <a-input v-model="editKey.newName" placeholder="请输入新的密钥名称" allow-clear />
@@ -137,7 +175,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { IconPlus, IconTool, IconInfoCircle } from '@arco-design/web-vue/es/icon'
 import { get, post, del, put } from '@/utils/api'
 import { Message, Modal } from '@arco-design/web-vue'
@@ -146,6 +184,12 @@ const keys = ref([])
 const loading = ref(true)
 const showAddKeyModal = ref(false)
 const showEditNameModal = ref(false)
+const savingKey = ref(false)
+const savingName = ref(false)
+const deletingKeyId = ref(null)
+const formError = ref('')
+const saveFeedback = ref(null)
+let feedbackTimer = null
 const newKey = ref({
   name: '',
   provider: '',
@@ -165,6 +209,18 @@ const providerNames = {
   aliyun: '阿里云',
   tencent: '腾讯云',
   cloudflare: 'Cloudflare'
+}
+
+const providerOptions = [
+  { value: 'aliyun', label: '阿里云' },
+  { value: 'tencent', label: '腾讯云' },
+  { value: 'cloudflare', label: 'Cloudflare' }
+]
+
+const providerTagColors = {
+  aliyun: 'orange',
+  tencent: 'arcoblue',
+  cloudflare: 'purple'
 }
 
 const providerKeyNames = {
@@ -201,6 +257,8 @@ const canSubmitNewKey = computed(() => {
   return !!newKey.value.secret_key
 })
 
+const canSubmitEditName = computed(() => !!editKey.value.newName?.trim())
+
 const filteredKeys = computed(() => {
   return keys.value.filter(item => {
     const matchProvider = !filters.value.provider || item.provider === filters.value.provider
@@ -230,35 +288,73 @@ const resetForm = () => {
     access_key: '',
     secret_key: ''
   }
+  formError.value = ''
+}
+
+const openAddKeyModal = () => {
+  resetForm()
+  showAddKeyModal.value = true
+}
+
+const handleCancelAdd = () => {
+  showAddKeyModal.value = false
+  resetForm()
+}
+
+const handleProviderChange = () => {
+  newKey.value.access_key = ''
+  newKey.value.secret_key = ''
+  formError.value = ''
 }
 
 const handleAddKey = async () => {
+  if (!canSubmitNewKey.value || savingKey.value) return
+
+  savingKey.value = true
+  formError.value = ''
   try {
+    const providerLabel = providerNames[newKey.value.provider] || '服务商'
     await post('/api/v1/provider-keys', newKey.value)
-    Message.success('添加密钥成功')
+    await fetchKeys()
     showAddKeyModal.value = false
     resetForm()
-    await fetchKeys()
+    setSaveFeedback('密钥已保存', `${providerLabel}凭据已就绪，现在可以去域名管理中选择它。`)
+    Message.success('密钥已保存，可立即使用')
   } catch (e) {
-    Message.error('添加密钥失败：' + (e.message || '未知错误'))
+    formError.value = e.message || '保存失败，请检查网络或凭据后重试'
+    Message.error('添加密钥失败')
+  } finally {
+    savingKey.value = false
   }
+}
+
+const setSaveFeedback = (title, message) => {
+  saveFeedback.value = { title, message }
+  if (feedbackTimer) clearTimeout(feedbackTimer)
+  feedbackTimer = setTimeout(() => {
+    saveFeedback.value = null
+  }, 5000)
 }
 
 // 删除密钥
 const handleDeleteKey = (key) => {
   Modal.warning({
     title: '确认删除',
-    content: `确定要删除密鑰 "${key.name}" 吗？关联的域名将无法使用。`,
+    content: `确定要删除密钥「${key.name}」吗？关联的域名将无法使用。`,
     okText: '删除',
     cancelText: '取消',
     okButtonProps: { status: 'danger' },
     async onOk() {
+      if (deletingKeyId.value) return
+      deletingKeyId.value = key.id
       try {
         await del('/api/v1/provider-keys', { provider: key.provider })
-        Message.success('删除密鑰成功')
         await fetchKeys()
+        Message.success('密钥已删除')
       } catch (e) {
-        Message.error('删除密鑰失败：' + (e.message || '未知错误'))
+        Message.error('删除密钥失败：' + (e.message || '未知错误'))
+      } finally {
+        deletingKeyId.value = null
       }
     }
   })
@@ -281,23 +377,30 @@ const resetEditForm = () => {
 }
 
 const handleUpdateKeyName = async () => {
+  if (!canSubmitEditName.value || savingName.value) return
+
+  savingName.value = true
   try {
     await put(`/api/v1/provider-keys/${editKey.value.id}/name`, {
-      new_name: editKey.value.newName
+      new_name: editKey.value.newName.trim()
     })
-    Message.success('更新密钥名称成功')
+    await fetchKeys()
     showEditNameModal.value = false
     resetEditForm()
-    await fetchKeys()
+    Message.success('密钥名称已更新')
   } catch (e) {
     Message.error('更新密钥名称失败：' + (e.message || '未知错误'))
+  } finally {
+    savingName.value = false
   }
 }
 
 // 掩码显示密钥
 const maskKey = (key) => {
   if (!key) return ''
-  return key.slice(0, 4) + '*'.repeat(key.length - 8) + key.slice(-4)
+  if (key.includes('****')) return key
+  if (key.length <= 8) return '••••••••'
+  return `${key.slice(0, 4)}••••${key.slice(-4)}`
 }
 
 // 获取当前服务商的字段名称
@@ -312,6 +415,127 @@ const showSecretKey = computed(() => {
 })
 
 onMounted(fetchKeys)
+onBeforeUnmount(() => {
+  if (feedbackTimer) clearTimeout(feedbackTimer)
+})
 </script>
 
-<style scoped></style>
+<style scoped>
+.page-feedback {
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+}
+
+.key-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.key-avatar,
+.modal-intro-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+.key-name {
+  overflow: hidden;
+  color: #0f172a;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.key-id,
+.muted-cell {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.credential-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.credential-label {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.credential-summary code {
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: #334155;
+  background: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.empty-state {
+  padding: 48px 20px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  color: #64748b;
+  background: #f1f5f9;
+  font-size: 22px;
+}
+
+.empty-state-title {
+  margin-top: 14px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.empty-state-description {
+  margin-top: 5px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.modal-intro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fbff, #eff6ff);
+}
+
+.modal-intro-title {
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-intro-text,
+.credential-hint {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.form-feedback {
+  margin-bottom: 16px;
+}
+</style>

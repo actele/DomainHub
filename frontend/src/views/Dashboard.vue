@@ -72,6 +72,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
 import { IconPublic, IconLock, IconExport, IconUser, IconTool } from '@arco-design/web-vue/es/icon'
+import { clearDomainRecordsCache } from '@/utils/domainRecordsCache'
 
 const router = useRouter()
 const route = useRoute()
@@ -91,6 +92,7 @@ const currentSection = computed(() => {
 const handleLogout = () => {
   localStorage.removeItem('token')
     localStorage.removeItem('role')
+  clearDomainRecordsCache()
   router.push('/login')
 }
 
@@ -107,33 +109,36 @@ const isAdmin = computed(() => localStorage.getItem('role') === 'admin')
 
 <style scoped>
 .dashboard-layout {
-  background: #f5f7fa;
+	min-height: 100vh;
+	background: transparent;
 }
 
 .dashboard-header {
-  height: 72px;
-  line-height: 72px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #e5e7eb;
+	height: 68px;
+	line-height: 68px;
+	background: rgba(255, 255, 255, 0.84);
+	backdrop-filter: blur(16px);
+	border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+	box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
 }
 
 .brand-badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: #1677ff;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+	width: 38px;
+	height: 38px;
+	border-radius: 12px;
+	background: linear-gradient(145deg, #2563eb, #4f46e5);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24);
 }
 
 .dashboard-menu {
-  padding: 12px 10px;
+	padding: 16px 12px;
 }
 
 .header-pill {
@@ -169,6 +174,50 @@ const isAdmin = computed(() => localStorage.getItem('role') === 'admin')
 }
 
 .dashboard-content {
-  background: transparent;
+	width: 100%;
+	max-width: 1680px;
+	margin: 0 auto;
+	background: transparent;
+}
+
+:deep(.dashboard-menu .arco-menu-item-group-title) {
+	padding: 18px 12px 8px;
+	color: #94a3b8;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+:deep(.dashboard-menu .arco-menu-item) {
+	min-height: 42px;
+	color: #64748b;
+	font-size: 13px;
+	transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+:deep(.dashboard-menu .arco-menu-item:hover) {
+	color: #1d4ed8;
+	background: #f1f5ff;
+	transform: translateX(2px);
+}
+
+@media (max-width: 760px) {
+	.dashboard-header {
+		padding-right: 16px !important;
+		padding-left: 16px !important;
+	}
+
+	.dashboard-header > div:first-child > div:last-child {
+		display: none;
+	}
+
+	.dashboard-header .header-pill {
+		display: none;
+	}
+
+	.dashboard-content {
+		padding: 16px !important;
+	}
 }
 </style>

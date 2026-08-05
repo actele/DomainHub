@@ -7,10 +7,12 @@ import (
 	"domain-manager/ent"
 	"domain-manager/middleware"
 	"domain-manager/service"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -128,9 +130,23 @@ func main() {
 		}
 	}
 
+	// 生产环境由同一个服务托管前端静态资源，反代只需要转发到该端口。
+	r.Static("/assets", "dist/assets")
+	r.NoRoute(func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet || strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.File("dist/index.html")
+	})
+
 	// 创建HTTP服务器
+	port := config.GlobalConfig.Server.Port
+	if port == 0 {
+		port = 8080
+	}
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%d", port),
 		Handler: r,
 	}
 

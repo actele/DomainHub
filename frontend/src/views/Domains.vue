@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="page-stack">
     <a-breadcrumb class="page-breadcrumb">
       <a-breadcrumb-item>控制台</a-breadcrumb-item>
       <a-breadcrumb-item>
@@ -11,6 +11,14 @@
         </span>
       </a-breadcrumb-item>
     </a-breadcrumb>
+
+    <div class="page-heading">
+      <div>
+        <div class="page-eyebrow">DNS / DOMAINS</div>
+        <h1 class="page-title">域名管理</h1>
+        <p class="page-subtitle">统一查看和维护已接入 DNS 服务商的托管域名。</p>
+      </div>
+    </div>
 
     <div class="page-toolbar">
       <a-space>
@@ -55,7 +63,10 @@
           <a-table-column title="操作" align="right" :width="180">
             <template #cell="{ record }">
               <div class="table-actions">
-                <a-button type="text" status="normal" @click="$router.push({ name: 'domain-records', params: { id: record.id } })">
+                <a-button type="text" status="normal"
+                  @mouseenter="preloadDomainRecords(record)"
+                  @focus="preloadDomainRecords(record)"
+                  @click="$router.push({ name: 'domain-records', params: { id: record.id } })">
                   解析记录
                 </a-button>
                 <a-button type="text" status="danger" @click="handleDeleteDomain(record)">
@@ -128,6 +139,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { get, post, del } from '@/utils/api'
+import { prefetchDomainRecords } from '@/utils/domainRecordsCache'
 import { IconPublic, IconPlus, IconInfoCircle } from '@arco-design/web-vue/es/icon'
 import { Message, Modal } from '@arco-design/web-vue'
 
@@ -169,6 +181,14 @@ const filteredDomains = computed(() => {
     return matchProvider && matchKeyword
   })
 })
+
+// 用户准备进入记录页时提前请求，点击后通常可以直接从缓存渲染。
+const preloadDomainRecords = (record) => {
+  if (!record?.id) return
+  prefetchDomainRecords(record.id).catch(() => {
+    // 预加载失败不打断域名列表，进入记录页时仍会正常重试。
+  })
+}
 
 // 获取域名列表
 const fetchDomains = async () => {

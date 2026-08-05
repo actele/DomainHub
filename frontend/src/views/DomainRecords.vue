@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="page-stack">
     <a-breadcrumb class="page-breadcrumb">
       <a-breadcrumb-item>控制台</a-breadcrumb-item>
       <a-breadcrumb-item>
@@ -15,6 +15,14 @@
         </span>
       </a-breadcrumb-item>
     </a-breadcrumb>
+
+    <div class="page-heading">
+      <div>
+        <div class="page-eyebrow">DNS / RECORDS</div>
+        <h1 class="page-title">解析记录</h1>
+        <p class="page-subtitle">{{ domain?.name || '当前域名' }} 的 DNS 记录与代理状态。</p>
+      </div>
+    </div>
 
     <div class="page-toolbar">
       <a-space>
@@ -37,6 +45,11 @@
         </a-select>
       </a-space>
       <div class="flex items-center gap-3">
+        <span v-if="recordCacheStatus" class="text-xs text-gray-400">{{ recordCacheStatus }}</span>
+        <a-button size="small" :loading="refreshing" @click="fetchRecords({ force: true })">
+          <template #icon><icon-refresh /></template>
+          刷新
+        </a-button>
         <span class="text-sm text-gray-500">共 {{ filteredRecords.length }} 条</span>
         <a-button type="primary" @click="showAddRecordModal = true">
           <template #icon><icon-plus /></template>
@@ -164,11 +177,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post, put, del } from '@/utils/api'
+import {
+  fetchDomainRecords,
+  getCachedDomainRecords,
+  isDomainRecordsCacheFresh,
+  isDomainRecordsCacheUsable
+} from '@/utils/domainRecordsCache'
 import { Message, Modal } from '@arco-design/web-vue'
-import { IconLeft, IconPlus, IconFile, IconSafe, IconInfoCircle } from '@arco-design/web-vue/es/icon'
+import { IconLeft, IconPlus, IconFile, IconSafe, IconInfoCircle, IconRefresh } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
 const router = useRouter()
@@ -176,6 +195,9 @@ const router = useRouter()
 const domain = ref(null)
 const records = ref([])
 const loading = ref(true)
+const refreshing = ref(false)
+const lastFetchedAt = ref(null)
+const recordsFromCache = ref(false)
 const showAddRecordModal = ref(false)
 const currentRecord = ref(null)
 const filters = ref({
@@ -214,6 +236,19 @@ const filteredRecords = computed(() => {
   })
 })
 
+const recordCacheStatus = computed(() => {
+  if (refreshing.value) {
+    return records.value.length ? '正在同步最新记录…' : '正在加载记录…'
+  }
+  if (!lastFetchedAt.value) return ''
+
+  const time = new Date(lastFetchedAt.value).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  return `${recordsFromCache.value ? '缓存于' : '更新于'} ${time}`
+})
+
 const toApiRecordPayload = (record, recordID = '') => {
   return {
     id: recordID || record.Id || '',
@@ -236,14 +271,38 @@ const fetchDomain = async () => {
 }
 
 // 获取记录列表
-const fetchRecords = async () => {
-  loading.value = true
+const fetchRecords = async ({ force = false } = {}) => {
+  const domainId = route.params.id
+  const cached = getCachedDomainRecords(domainId)
+  const canShowCache = !force && isDomainRecordsCacheUsable(cached)
+
+  if (canShowCache) {
+    records.value = cached.records
+    lastFetchedAt.value = cached.fetchedAt
+    recordsFromCache.value = true
+    loading.value = false
+  } else if (!records.value.length) {
+    loading.value = true
+  }
+
+  // 新页面有可用缓存时直接显示；缓存已过期则在页面上保留旧数据并后台同步。
+  if (!force && canShowCache && isDomainRecordsCacheFresh(cached)) return
+
+  refreshing.value = true
   try {
-    records.value = await get(`/api/v1/domains/${route.params.id}/records`)
+    const result = await fetchDomainRecords(domainId, { force })
+    records.value = result.records
+    lastFetchedAt.value = result.fetchedAt
+    recordsFromCache.value = result.fromCache
   } catch (e) {
-    Message.error('获取记录列表失败')
+    if (!cached || !records.value.length) {
+      Message.error(e.message || '获取记录列表失败')
+    } else {
+      Message.warning('服务商暂时无法连接，当前显示的是上次缓存记录')
+    }
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -284,8 +343,9 @@ const resetRecordForm = () => {
 
 // 保存记录
 const handleSaveRecord = async () => {
+  const isEditing = Boolean(currentRecord.value)
   try {
-    if (currentRecord.value) {
+    if (isEditing) {
       await put(
         `/api/v1/domains/${route.params.id}/records/${currentRecord.value.Id}`,
         toApiRecordPayload(newRecord.value, currentRecord.value.Id)
@@ -305,9 +365,9 @@ const handleSaveRecord = async () => {
       Remark: '',
       Enabled: true
     }
-    await fetchRecords()
+    await fetchRecords({ force: true })
   } catch (e) {
-    Message.error(currentRecord.value ? ('更新记录失败：' + (e.message || '未知错误')) : ('添加记录失败：' + (e.message || '未知错误')))
+    Message.error(isEditing ? ('更新记录失败：' + (e.message || '未知错误')) : ('添加记录失败：' + (e.message || '未知错误')))
   }
 }
 
@@ -322,7 +382,7 @@ const deleteRecord = (record) => {
       try {
         await del(`/api/v1/domains/${route.params.id}/records/${record.Id}`)
         Message.success('删除记录成功')
-        await fetchRecords()
+        await fetchRecords({ force: true })
       } catch (e) {
         Message.error('删除记录失败')
       }
@@ -337,16 +397,22 @@ const toggleProxy = async (record) => {
       ...toApiRecordPayload(record, record.Id),
       proxied: !record.Proxied
     })
-    await fetchRecords()
+    await fetchRecords({ force: true })
   } catch (e) {
     Message.error('更新代理状态失败')
   }
 }
 
-onMounted(async () => {
-  await fetchDomain()
-  await fetchRecords()
-})
+const loadPage = async () => {
+  domain.value = null
+  records.value = []
+  lastFetchedAt.value = null
+  recordsFromCache.value = false
+  await Promise.all([fetchDomain(), fetchRecords()])
+}
+
+onMounted(loadPage)
+watch(() => route.params.id, loadPage)
 </script>
 
 <style scoped></style>

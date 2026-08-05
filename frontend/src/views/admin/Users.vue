@@ -25,6 +25,7 @@
         </a-select>
       </a-space>
       <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-400">root 为系统内置账号</span>
         <span class="text-sm text-gray-500">共 {{ filteredUsers.length }} 个账号</span>
         <a-button type="primary" @click="showCreateModal = true">
           <template #icon><icon-plus /></template>
@@ -148,7 +149,9 @@ const filteredUsers = computed(() => {
 const fetchUsers = async () => {
   loading.value = true
   try {
-    users.value = await get('/api/v1/admin/users')
+    const result = await get('/api/v1/admin/users')
+    // 后端已经过滤内置账号，这里再做一次防御性过滤，避免旧版本接口泄露 root。
+    users.value = (Array.isArray(result) ? result : []).filter(user => user.username?.toLowerCase() !== 'root')
   } catch (e) {
     Message.error('获取用户列表失败：' + (e.message || ''))
   } finally {
