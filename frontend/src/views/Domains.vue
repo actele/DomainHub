@@ -21,15 +21,15 @@
     </div>
 
     <div class="page-toolbar">
-      <a-space>
-        <a-input v-model="filters.keyword" placeholder="搜索域名" allow-clear style="width: 240px" />
-        <a-select v-model="filters.provider" placeholder="全部服务商" allow-clear style="width: 180px">
+      <a-space class="toolbar-filters">
+        <a-input v-model="filters.keyword" placeholder="搜索域名" allow-clear class="toolbar-input toolbar-input-search" />
+        <a-select v-model="filters.provider" placeholder="全部服务商" allow-clear class="toolbar-input toolbar-input-provider">
           <a-option value="aliyun">阿里云</a-option>
           <a-option value="tencent">腾讯云</a-option>
           <a-option value="cloudflare">Cloudflare</a-option>
         </a-select>
       </a-space>
-      <div class="flex items-center gap-3">
+      <div class="toolbar-meta">
         <span class="text-sm text-gray-500">共 {{ filteredDomains.length }} 条</span>
         <a-button type="primary" @click="showAddDomainModal = true">
           <template #icon><IconPlus /></template>
@@ -38,8 +38,8 @@
       </div>
     </div>
 
-    <!-- 域名列表 -->
-    <a-card :bordered="false" class="general-card">
+    <!-- 域名列表 — 桌面 / 平板 -->
+    <a-card v-if="!isMobile" :bordered="false" class="general-card">
       <a-table :loading="loading" :data="filteredDomains" :pagination="tablePagination">
         <template #columns>
           <a-table-column title="域名" data-index="name" :width="320">
@@ -92,6 +92,50 @@
       </a-table>
     </a-card>
 
+    <!-- 域名列表 — 手机（卡片栈） -->
+    <div v-else class="domain-mobile-list">
+      <a-spin :loading="loading" class="w-full">
+        <div v-if="!filteredDomains.length" class="text-center py-10 text-gray-500 text-sm">
+          暂无域名
+        </div>
+        <div v-for="record in pagedDomains" :key="record.id" class="list-card">
+          <div class="list-card-header">
+            <div>
+              <div class="list-card-title flex items-center gap-2">
+                <IconPublic class="text-gray-400" />
+                <span class="text-primary">{{ record.name }}</span>
+              </div>
+              <div class="list-card-meta">
+                {{ providerNames[record.provider] || record.provider }}
+                · {{ record.created_at ? new Date(record.created_at).toLocaleString() : '-' }}
+              </div>
+            </div>
+          </div>
+          <div class="list-card-actions">
+            <a-button type="text"
+              @mouseenter="preloadDomainRecords(record)"
+              @focus="preloadDomainRecords(record)"
+              @click="$router.push({ name: 'domain-records', params: { id: record.id } })">
+              解析记录
+            </a-button>
+            <a-button type="text" status="danger" @click="handleDeleteDomain(record)">
+              删除
+            </a-button>
+          </div>
+        </div>
+        <a-pagination
+          v-if="filteredDomains.length > tablePagination.pageSize"
+          class="mt-3 justify-center"
+          :total="filteredDomains.length"
+          :page-size="tablePagination.pageSize"
+          :current="currentPage"
+          show-total
+          @change="(p) => (currentPage = p)"
+          @page-size-change="(s) => { tablePagination.pageSize = s; currentPage = 1 }"
+        />
+      </a-spin>
+    </div>
+
     <!-- 添加域名对话框 -->
     <a-modal v-model:visible="showAddDomainModal" title="添加域名" @ok="handleAddDomain" @cancel="resetAddDomain"
       :ok-button-props="{ disabled: !newDomain.name || !newDomain.provider }" ok-text="添加" cancel-text="取消"
@@ -142,6 +186,9 @@ import { get, post, del } from '@/utils/api'
 import { prefetchDomainRecords } from '@/utils/domainRecordsCache'
 import { IconPublic, IconPlus, IconInfoCircle } from '@arco-design/web-vue/es/icon'
 import { Message, Modal } from '@arco-design/web-vue'
+import { useMediaQuery } from '@/composables/useBreakpoint'
+
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const domains = ref([])
 const loading = ref(true)
@@ -172,6 +219,8 @@ const tablePagination = {
   pageSizeOptions: [10, 20, 50, 100]
 }
 
+const currentPage = ref(1)
+
 const filteredDomains = computed(() => {
   return domains.value.filter(item => {
     const matchProvider = !filters.value.provider || item.provider === filters.value.provider
@@ -180,6 +229,12 @@ const filteredDomains = computed(() => {
       item.name?.toLowerCase().includes(query)
     return matchProvider && matchKeyword
   })
+})
+
+// Mobile card view paginates client-side (table component already handles it for desktop).
+const pagedDomains = computed(() => {
+  const start = (currentPage.value - 1) * tablePagination.pageSize
+  return filteredDomains.value.slice(start, start + tablePagination.pageSize)
 })
 
 // 用户准备进入记录页时提前请求，点击后通常可以直接从缓存渲染。

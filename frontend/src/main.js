@@ -18,7 +18,9 @@ import {
 	Breadcrumb,
 	Tooltip,
 	Radio,
-	Switch
+	Switch,
+	Drawer,
+	List
 } from '@arco-design/web-vue'
 import '@arco-design/web-vue/es/menu/style/css'
 import App from './App.vue'
@@ -49,5 +51,7 @@ app.use(Breadcrumb)
 app.use(Tooltip)
 app.use(Radio)
 app.use(Switch)
+app.use(Drawer)
+app.use(List)
 
 app.mount('#app')

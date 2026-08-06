@@ -47,8 +47,8 @@
       </div>
     </div>
 
-    <!-- 密钥列表 -->
-    <a-card :bordered="false" class="general-card">
+    <!-- 密钥列表 — 桌面 / 平板 -->
+    <a-card v-if="!isMobile" :bordered="false" class="general-card">
       <a-table :loading="loading" :data="filteredKeys" :pagination="tablePagination">
         <template #columns>
           <a-table-column title="密钥名称" :width="260">
@@ -111,6 +111,50 @@
         </template>
       </a-table>
     </a-card>
+
+    <!-- 密钥列表 — 手机（卡片栈） -->
+    <div v-else class="key-mobile-list">
+      <a-spin :loading="loading" class="w-full">
+        <div v-if="!pagedKeys.length" class="text-center py-10 text-gray-500 text-sm">
+          暂无密钥
+        </div>
+        <div v-for="record in pagedKeys" :key="record.id" class="list-card">
+          <div class="list-card-header">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="key-avatar"><IconTool /></div>
+              <div class="min-w-0">
+                <div class="list-card-title">{{ record.name }}</div>
+                <div class="list-card-meta">ID · {{ record.id }}</div>
+              </div>
+            </div>
+            <a-tag :color="providerTagColors[record.provider] || 'gray'" size="small">
+              {{ providerNames[record.provider] || record.provider }}
+            </a-tag>
+          </div>
+          <dl class="list-card-fields">
+            <dt>{{ getKeyFieldName(record.provider, 'access_key') }}</dt>
+            <dd><code>{{ maskKey(record.access_key) }}</code></dd>
+            <dt>创建时间</dt>
+            <dd>{{ new Date(record.created_at).toLocaleString() }}</dd>
+          </dl>
+          <div class="list-card-actions">
+            <a-button type="text" size="small" @click="handleEditKeyName(record)">编辑名称</a-button>
+            <a-button type="text" size="small" status="danger" :loading="deletingKeyId === record.id"
+              :disabled="!!deletingKeyId" @click="handleDeleteKey(record)">删除</a-button>
+          </div>
+        </div>
+        <a-pagination
+          v-if="filteredKeys.length > tablePagination.pageSize"
+          class="mt-3 justify-center"
+          :total="filteredKeys.length"
+          :page-size="tablePagination.pageSize"
+          :current="currentPage"
+          show-total
+          @change="(p) => (currentPage = p)"
+          @page-size-change="(s) => { tablePagination.pageSize = s; currentPage = 1 }"
+        />
+      </a-spin>
+    </div>
 
     <!-- 添加密钥对话框 -->
     <a-modal v-model:visible="showAddKeyModal" title="添加服务商密钥" @ok="handleAddKey" @cancel="handleCancelAdd"
@@ -179,6 +223,9 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { IconPlus, IconTool, IconInfoCircle } from '@arco-design/web-vue/es/icon'
 import { get, post, del, put } from '@/utils/api'
 import { Message, Modal } from '@arco-design/web-vue'
+import { useMediaQuery } from '@/composables/useBreakpoint'
+
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const keys = ref([])
 const loading = ref(true)
@@ -266,6 +313,13 @@ const filteredKeys = computed(() => {
     const matchKeyword = !query || (item.name || '').toLowerCase().includes(query)
     return matchProvider && matchKeyword
   })
+})
+
+// Mobile card view paginates client-side.
+const currentPage = ref(1)
+const pagedKeys = computed(() => {
+  const start = (currentPage.value - 1) * tablePagination.pageSize
+  return filteredKeys.value.slice(start, start + tablePagination.pageSize)
 })
 
 // 获取密钥列表

@@ -25,15 +25,15 @@
     </div>
 
     <div class="page-toolbar">
-      <a-space>
+      <a-space class="toolbar-filters">
         <router-link :to="{ name: 'domains' }">
           <a-button size="small">
             <template #icon><icon-left /></template>
             返回
           </a-button>
         </router-link>
-        <a-input v-model="filters.keyword" placeholder="搜索主机记录/记录值" allow-clear style="width: 260px" />
-        <a-select v-model="filters.type" placeholder="全部记录类型" allow-clear style="width: 180px">
+        <a-input v-model="filters.keyword" placeholder="搜索主机记录/记录值" allow-clear class="toolbar-input toolbar-input-search" />
+        <a-select v-model="filters.type" placeholder="全部记录类型" allow-clear class="toolbar-input toolbar-input-provider">
           <a-option value="A">A</a-option>
           <a-option value="AAAA">AAAA</a-option>
           <a-option value="CNAME">CNAME</a-option>
@@ -44,7 +44,7 @@
           <a-option value="CAA">CAA</a-option>
         </a-select>
       </a-space>
-      <div class="flex items-center gap-3">
+      <div class="toolbar-meta">
         <span v-if="recordCacheStatus" class="text-xs text-gray-400">{{ recordCacheStatus }}</span>
         <a-button size="small" :loading="refreshing" @click="fetchRecords({ force: true })">
           <template #icon><icon-refresh /></template>
@@ -58,8 +58,8 @@
       </div>
     </div>
 
-    <!-- 记录列表 -->
-    <a-card :bordered="false" class="general-card">
+    <!-- 记录列表 — 桌面 / 平板 -->
+    <a-card v-if="!isMobile" :bordered="false" class="general-card">
       <a-table :loading="loading" :data="filteredRecords" :pagination="tablePagination">
         <template #columns>
           <a-table-column title="主机记录" data-index="Name" :width="220">
@@ -77,11 +77,6 @@
           <a-table-column title="TTL" data-index="TTL" :width="100">
             <template #cell="{ record }">
               {{ record.TTL }}秒
-            </template>
-          </a-table-column>
-          <a-table-column title="备注" data-index="Remark" :width="180">
-            <template #cell="{ record }">
-              {{ record.Remark || '-' }}
             </template>
           </a-table-column>
           <a-table-column title="状态" :width="190">
@@ -126,6 +121,57 @@
 
     </a-card>
 
+    <!-- 记录列表 — 手机（卡片栈） -->
+    <div v-else class="record-mobile-list">
+      <a-spin :loading="loading" class="w-full">
+        <div v-if="!pagedRecords.length" class="text-center py-10 text-gray-500 text-sm">
+          暂无解析记录
+        </div>
+        <div v-for="record in pagedRecords" :key="record.Id || `${record.Name}-${record.Type}`" class="list-card">
+          <div class="list-card-header">
+            <div>
+              <div class="list-card-title">
+                <span class="text-primary">{{ record.Name || '@' }}</span>
+                <a-tag size="small" class="ml-2">{{ record.Type }}</a-tag>
+              </div>
+              <div class="list-card-meta">
+                {{ record.Line || '默认' }}
+                · TTL {{ record.TTL }}秒
+              </div>
+            </div>
+            <a-space>
+              <a-tag :color="record.Enabled ? 'green' : 'gray'" size="small">
+                {{ record.Enabled ? '启用' : '禁用' }}
+              </a-tag>
+              <a-tag v-if="domain?.provider === 'cloudflare'" :color="record.Proxied ? 'orange' : 'gray'"
+                size="small" class="cursor-pointer" @click="toggleProxy(record)">
+                <template #icon><icon-safe /></template>
+                {{ record.Proxied ? '已代理' : '未代理' }}
+              </a-tag>
+            </a-space>
+          </div>
+          <dl class="list-card-fields">
+            <dt>记录值</dt>
+            <dd>{{ record.Value }}</dd>
+          </dl>
+          <div class="list-card-actions">
+            <a-button type="text" size="small" @click="editRecord(record)">编辑</a-button>
+            <a-button type="text" size="small" status="danger" @click="deleteRecord(record)">删除</a-button>
+          </div>
+        </div>
+        <a-pagination
+          v-if="filteredRecords.length > tablePagination.pageSize"
+          class="mt-3 justify-center"
+          :total="filteredRecords.length"
+          :page-size="tablePagination.pageSize"
+          :current="currentPage"
+          show-total
+          @change="(p) => (currentPage = p)"
+          @page-size-change="(s) => { tablePagination.pageSize = s; currentPage = 1 }"
+        />
+      </a-spin>
+    </div>
+
     <!-- 添加/编辑记录对话框 -->
     <a-modal v-model:visible="showAddRecordModal" :title="currentRecord ? '编辑解析记录' : '添加解析记录'"
       @ok="handleSaveRecord" @cancel="resetRecordForm"
@@ -160,9 +206,6 @@
         <a-form-item field="Value" label="记录值">
           <a-input v-model="newRecord.Value" :placeholder="getRecordValuePlaceholder(newRecord.Type)" allow-clear />
         </a-form-item>
-        <a-form-item field="Remark" label="备注">
-          <a-input v-model="newRecord.Remark" placeholder="可选，便于识别此记录的用途" allow-clear />
-        </a-form-item>
         <a-form-item :hide-label="true">
           <div class="modal-switch-row">
             <a-switch v-model="newRecord.Enabled" />
@@ -188,6 +231,9 @@ import {
 } from '@/utils/domainRecordsCache'
 import { Message, Modal } from '@arco-design/web-vue'
 import { IconLeft, IconPlus, IconFile, IconSafe, IconInfoCircle, IconRefresh } from '@arco-design/web-vue/es/icon'
+import { useMediaQuery } from '@/composables/useBreakpoint'
+
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const route = useRoute()
 const router = useRouter()
@@ -210,7 +256,6 @@ const newRecord = ref({
   Name: '',
   Value: '',
   TTL: 600,
-  Remark: '',
   Enabled: true
 })
 
@@ -225,6 +270,8 @@ const tablePagination = {
   pageSizeOptions: [10, 20, 50, 100]
 }
 
+const currentPage = ref(1)
+
 const filteredRecords = computed(() => {
   return records.value.filter(item => {
     const matchType = !filters.value.type || item.Type === filters.value.type
@@ -234,6 +281,12 @@ const filteredRecords = computed(() => {
       (item.Value || '').toLowerCase().includes(query)
     return matchType && matchKeyword
   })
+})
+
+// Mobile card view paginates client-side.
+const pagedRecords = computed(() => {
+  const start = (currentPage.value - 1) * tablePagination.pageSize
+  return filteredRecords.value.slice(start, start + tablePagination.pageSize)
 })
 
 const recordCacheStatus = computed(() => {
@@ -336,7 +389,6 @@ const resetRecordForm = () => {
     Name: '',
     Value: '',
     TTL: 600,
-    Remark: '',
     Enabled: true
   }
 }
@@ -362,7 +414,6 @@ const handleSaveRecord = async () => {
       Name: '',
       Value: '',
       TTL: 600,
-      Remark: '',
       Enabled: true
     }
     await fetchRecords({ force: true })

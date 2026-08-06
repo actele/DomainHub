@@ -13,18 +13,18 @@
     </a-breadcrumb>
 
     <div class="page-toolbar">
-      <a-space>
-        <a-input v-model="filters.keyword" placeholder="搜索用户名" allow-clear style="width: 240px" />
-        <a-select v-model="filters.role" placeholder="全部角色" allow-clear style="width: 160px">
+      <a-space class="toolbar-filters">
+        <a-input v-model="filters.keyword" placeholder="搜索用户名" allow-clear class="toolbar-input toolbar-input-search" />
+        <a-select v-model="filters.role" placeholder="全部角色" allow-clear class="toolbar-input toolbar-input-provider">
           <a-option value="admin">管理员</a-option>
           <a-option value="user">普通用户</a-option>
         </a-select>
-        <a-select v-model="filters.status" placeholder="全部状态" allow-clear style="width: 160px">
+        <a-select v-model="filters.status" placeholder="全部状态" allow-clear class="toolbar-input toolbar-input-provider">
           <a-option value="active">正常</a-option>
           <a-option value="disabled">已禁用</a-option>
         </a-select>
       </a-space>
-      <div class="flex items-center gap-3">
+      <div class="toolbar-meta">
         <span class="text-xs text-slate-400">root 为系统内置账号</span>
         <span class="text-sm text-gray-500">共 {{ filteredUsers.length }} 个账号</span>
         <a-button type="primary" @click="showCreateModal = true">
@@ -34,7 +34,7 @@
       </div>
     </div>
 
-    <a-card :bordered="false" class="general-card">
+    <a-card v-if="!isMobile" :bordered="false" class="general-card">
       <a-table :loading="loading" :data="filteredUsers" :pagination="tablePagination">
         <template #columns>
           <a-table-column title="用户名" :width="200">
@@ -84,6 +84,56 @@
       </a-table>
     </a-card>
 
+    <div v-else class="user-mobile-list">
+      <a-spin :loading="loading" class="w-full">
+        <div v-if="!pagedUsers.length" class="text-center py-10 text-gray-500 text-sm">
+          暂无账号
+        </div>
+        <div v-for="record in pagedUsers" :key="record.id" class="list-card">
+          <div class="list-card-header">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                {{ record.username[0].toUpperCase() }}
+              </div>
+              <div class="min-w-0">
+                <div class="list-card-title">{{ record.username }}</div>
+                <div class="list-card-meta">{{ record.created_at }}</div>
+              </div>
+            </div>
+            <a-space direction="vertical" :size="4" align="end">
+              <a-tag :color="record.role === 'admin' ? 'blue' : 'gray'" size="small">
+                {{ record.role === 'admin' ? '管理员' : '普通用户' }}
+              </a-tag>
+              <a-tag :color="record.status === 'active' ? 'green' : 'red'" size="small">
+                {{ record.status === 'active' ? '正常' : '已禁用' }}
+              </a-tag>
+            </a-space>
+          </div>
+          <div class="list-card-actions">
+            <a-button type="text" size="small" @click="openResetPwd(record)">重置密码</a-button>
+            <a-button type="text" size="small" @click="toggleRole(record)">
+              {{ record.role === 'admin' ? '降为用户' : '升为管理员' }}
+            </a-button>
+            <a-button type="text" size="small"
+              :status="record.status === 'active' ? 'danger' : 'normal'"
+              @click="toggleStatus(record)">
+              {{ record.status === 'active' ? '禁用' : '启用' }}
+            </a-button>
+          </div>
+        </div>
+        <a-pagination
+          v-if="filteredUsers.length > tablePagination.pageSize"
+          class="mt-3 justify-center"
+          :total="filteredUsers.length"
+          :page-size="tablePagination.pageSize"
+          :current="currentPage"
+          show-total
+          @change="(p) => (currentPage = p)"
+          @page-size-change="(s) => { tablePagination.pageSize = s; currentPage = 1 }"
+        />
+      </a-spin>
+    </div>
+
     <!-- 添加账号 -->
     <a-modal v-model:visible="showCreateModal" title="添加账号" @ok="handleCreate" @cancel="resetCreate"
       :ok-button-props="{ disabled: !newUser.username || !newUser.password }"
@@ -125,6 +175,9 @@ import { ref, computed, onMounted } from 'vue'
 import { get, post, put } from '@/utils/api'
 import { Message } from '@arco-design/web-vue'
 import { IconPlus, IconInfoCircle } from '@arco-design/web-vue/es/icon'
+import { useMediaQuery } from '@/composables/useBreakpoint'
+
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const users = ref([])
 const loading = ref(false)
@@ -144,6 +197,12 @@ const filteredUsers = computed(() => {
       && (!filters.value.role || u.role === filters.value.role)
       && (!filters.value.status || u.status === filters.value.status)
   })
+})
+
+const currentPage = ref(1)
+const pagedUsers = computed(() => {
+  const start = (currentPage.value - 1) * tablePagination.pageSize
+  return filteredUsers.value.slice(start, start + tablePagination.pageSize)
 })
 
 const fetchUsers = async () => {

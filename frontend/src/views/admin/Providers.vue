@@ -13,14 +13,14 @@
     </a-breadcrumb>
 
     <div class="page-toolbar">
-      <a-space>
-        <a-input v-model="filters.keyword" placeholder="搜索服务商名称" allow-clear style="width: 240px" />
-        <a-select v-model="filters.status" placeholder="全部状态" allow-clear style="width: 160px">
+      <a-space class="toolbar-filters">
+        <a-input v-model="filters.keyword" placeholder="搜索服务商名称" allow-clear class="toolbar-input toolbar-input-search" />
+        <a-select v-model="filters.status" placeholder="全部状态" allow-clear class="toolbar-input toolbar-input-provider">
           <a-option :value="true">已启用</a-option>
           <a-option :value="false">已禁用</a-option>
         </a-select>
       </a-space>
-      <div class="flex items-center gap-3">
+      <div class="toolbar-meta">
         <span class="text-sm text-gray-500">共 {{ filteredProviders.length }} 个服务商</span>
         <a-button type="primary" @click="showCreateModal = true">
           <template #icon><icon-plus /></template>
@@ -29,7 +29,7 @@
       </div>
     </div>
 
-    <a-card :bordered="false" class="general-card">
+    <a-card v-if="!isMobile" :bordered="false" class="general-card">
       <a-table :loading="loading" :data="filteredProviders" :pagination="false">
         <template #columns>
           <a-table-column title="服务商名称" :width="200">
@@ -68,6 +68,37 @@
       </a-table>
     </a-card>
 
+    <div v-else class="provider-mobile-list">
+      <a-spin :loading="loading" class="w-full">
+        <div v-if="!filteredProviders.length" class="text-center py-10 text-gray-500 text-sm">
+          暂无服务商
+        </div>
+        <div v-for="record in filteredProviders" :key="record.id" class="list-card">
+          <div class="list-card-header">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                <icon-cloud />
+              </div>
+              <div class="min-w-0">
+                <div class="list-card-title">{{ record.name }}</div>
+                <div class="list-card-meta">
+                  <a-tag color="arcoblue" size="small">{{ record.type }}</a-tag>
+                  <span v-if="record.description">{{ record.description }}</span>
+                </div>
+              </div>
+            </div>
+            <a-switch :model-value="record.enabled" size="small"
+              @change="(val) => toggleStatus(record, val)" />
+          </div>
+          <div class="list-card-actions">
+            <a-button type="text" size="small" status="danger" @click="handleDelete(record)">
+              删除
+            </a-button>
+          </div>
+        </div>
+      </a-spin>
+    </div>
+
     <!-- 添加服务商 -->
     <a-modal v-model:visible="showCreateModal" title="添加服务商" @ok="handleCreate" @cancel="resetForm"
       :ok-button-props="{ disabled: !newProvider.name || !newProvider.type }"
@@ -95,6 +126,9 @@ import { ref, computed, onMounted } from 'vue'
 import { get, post, put, del } from '@/utils/api'
 import { Message, Modal } from '@arco-design/web-vue'
 import { IconPlus, IconCloud, IconInfoCircle } from '@arco-design/web-vue/es/icon'
+import { useMediaQuery } from '@/composables/useBreakpoint'
+
+const isMobile = useMediaQuery('(max-width: 767px)')
 
 const providers = ref([])
 const loading = ref(false)

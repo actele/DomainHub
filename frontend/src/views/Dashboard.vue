@@ -1,7 +1,19 @@
 <template>
   <a-layout class="h-screen dashboard-layout">
     <a-layout-header class="dashboard-header fixed w-full z-10 px-8 flex justify-between items-center">
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
+        <a-button
+          v-if="!isLg"
+          class="menu-trigger"
+          type="text"
+          size="large"
+          aria-label="打开菜单"
+          @click="drawerOpen = true"
+        >
+          <template #icon>
+            <IconMenu />
+          </template>
+        </a-button>
         <div class="brand-badge">DM</div>
         <div>
           <div class="text-xl font-bold text-slate-900">域名管理系统</div>
@@ -25,57 +37,103 @@
       </div>
     </a-layout-header>
 
-    <a-layout style="margin-top: 72px">
-      <a-layout-sider :width="220" class="h-[calc(100vh-72px)] bg-white">
-        <a-menu :selected-keys="[$route.name]" class="dashboard-menu" :style="{ height: '100%', borderRight: 0 }"
-          @menuItemClick="handleMenuClick">
+    <a-layout class="layout-body">
+      <a-layout-sider
+        v-if="isLg"
+        :width="220"
+        class="h-[calc(100vh-68px)] bg-white dashboard-sider"
+      >
+        <a-menu
+          :selected-keys="[$route.name]"
+          class="dashboard-menu"
+          :style="{ height: '100%', borderRight: 0 }"
+          @menuItemClick="handleMenuSelect"
+        >
           <a-menu-item key="domains">
-            <template #icon>
-              <IconPublic />
-            </template>
+            <template #icon><IconPublic /></template>
             域名管理
           </a-menu-item>
           <a-menu-item key="provider-keys">
-            <template #icon>
-              <IconLock />
-            </template>
+            <template #icon><IconLock /></template>
             服务商密钥
           </a-menu-item>
-            <template v-if="isAdmin">
-              <a-menu-item-group title="系统管理">
-                <a-menu-item key="admin-users">
-                  <template #icon>
-                    <IconUser />
-                  </template>
-                  账号管理
-                </a-menu-item>
-                <a-menu-item key="admin-providers">
-                  <template #icon>
-                    <IconTool />
-                  </template>
-                  服务商管理
-                </a-menu-item>
-              </a-menu-item-group>
-            </template>
-          </a-menu>
+          <template v-if="isAdmin">
+            <a-menu-item-group title="系统管理">
+              <a-menu-item key="admin-users">
+                <template #icon><IconUser /></template>
+                账号管理
+              </a-menu-item>
+              <a-menu-item key="admin-providers">
+                <template #icon><IconTool /></template>
+                服务商管理
+              </a-menu-item>
+            </a-menu-item-group>
+          </template>
+        </a-menu>
       </a-layout-sider>
 
       <a-layout-content class="dashboard-content p-6">
         <router-view />
       </a-layout-content>
     </a-layout>
+
+    <a-drawer
+      v-if="!isLg"
+      :visible="drawerOpen"
+      placement="left"
+      :width="280"
+      :footer="false"
+      :mask-closable="true"
+      :closable="true"
+      class="dashboard-drawer"
+      @cancel="drawerOpen = false"
+      @ok="drawerOpen = false"
+    >
+      <a-menu
+        :selected-keys="[$route.name]"
+        class="dashboard-menu"
+        :style="{ height: '100%', borderRight: 0 }"
+        @menuItemClick="handleMenuSelect"
+      >
+        <a-menu-item key="domains">
+          <template #icon><IconPublic /></template>
+          域名管理
+        </a-menu-item>
+        <a-menu-item key="provider-keys">
+          <template #icon><IconLock /></template>
+          服务商密钥
+        </a-menu-item>
+        <template v-if="isAdmin">
+          <a-menu-item-group title="系统管理">
+            <a-menu-item key="admin-users">
+              <template #icon><IconUser /></template>
+              账号管理
+            </a-menu-item>
+            <a-menu-item key="admin-providers">
+              <template #icon><IconTool /></template>
+              服务商管理
+            </a-menu-item>
+          </a-menu-item-group>
+        </template>
+      </a-menu>
+    </a-drawer>
   </a-layout>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
-import { IconPublic, IconLock, IconExport, IconUser, IconTool } from '@arco-design/web-vue/es/icon'
+import { IconPublic, IconLock, IconExport, IconUser, IconTool, IconMenu } from '@arco-design/web-vue/es/icon'
 import { clearDomainRecordsCache } from '@/utils/domainRecordsCache'
+import { useMediaQuery } from '@/composables/useBreakpoint'
 
 const router = useRouter()
 const route = useRoute()
+
+// ≥1024px → keep sider; below that → hide sider, show drawer-backed hamburger
+const isLg = useMediaQuery('(min-width: 1024px)')
+const drawerOpen = ref(false)
 
 const sectionNameMap = {
   domains: '域名管理',
@@ -96,12 +154,14 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-const handleMenuClick = (key) => {
+const handleMenuSelect = (key) => {
   if (key.startsWith('admin-')) {
     router.push(`/dashboard/admin/${key.replace('admin-', '')}`)
   } else {
     router.push(`/dashboard/${key}`)
   }
+  // close drawer on mobile after navigation
+  drawerOpen.value = false
 }
 
 const isAdmin = computed(() => localStorage.getItem('role') === 'admin')
@@ -178,6 +238,20 @@ const isAdmin = computed(() => localStorage.getItem('role') === 'admin')
 	max-width: 1680px;
 	margin: 0 auto;
 	background: transparent;
+}
+
+.layout-body {
+	margin-top: 68px;
+}
+
+@media (max-width: 1023px) {
+	.layout-body {
+		margin-top: 0;
+		/* On smaller viewports the header is fixed but sider is hidden, so the
+		   layout body still needs to clear it. Padding (not margin) keeps the
+		   background gradient from the body itself uninterrupted. */
+		padding-top: 68px;
+	}
 }
 
 :deep(.dashboard-menu .arco-menu-item-group-title) {
